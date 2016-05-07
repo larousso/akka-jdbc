@@ -1,6 +1,7 @@
 package com.adelegue.akka.jdbc.query;
 
 import akka.NotUsed;
+import akka.stream.javadsl.Flow;
 import akka.stream.javadsl.Source;
 import com.adelegue.akka.jdbc.stream.source.UpdateQueryGeneratedKeysSource;
 import com.adelegue.akka.jdbc.utils.ResultSetExtractor;
@@ -8,6 +9,7 @@ import scala.concurrent.Future;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Function;
 
 /**
  * Created by adelegue on 01/05/2016.
@@ -33,13 +35,21 @@ public class UpdateQueryGeneratedKeyBuilder<Out> extends AbstractQueryBuilder<Up
 
     public Source<Out, ?> get() {
         Source<Out, NotUsed> querySource = Source.fromFuture(sqlContext).flatMapMerge(1, ctx ->
-                Source.fromGraph(new UpdateQueryGeneratedKeysSource<>(ctx, this, resultSetExtractor, transaction))
+                applyDispatcher(Source.fromGraph(new UpdateQueryGeneratedKeysSource<>(ctx, this, resultSetExtractor, transaction)), ctx.dispatcher)
         );
         if(depends != null) {
             return depends.fold(0, (acc, elt) -> acc + 1).flatMapMerge(1, i -> querySource);
         } else {
             return querySource;
         }
+    }
+
+    public <In> Flow<In, Out, ?> grabInParams(Function<In, List<?>> convertParams) {
+        return Flow.<In>create().flatMapMerge(1, in -> this.params(convertParams.apply(in)).get());
+    }
+
+    public <In> Flow<In, Out, ?> grabInParam(Function<In, ?> convertParams) {
+        return Flow.<In>create().flatMapMerge(1, in -> this.param(convertParams.apply(in)).get());
     }
 
 }

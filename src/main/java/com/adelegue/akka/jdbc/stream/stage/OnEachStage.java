@@ -1,6 +1,5 @@
 package com.adelegue.akka.jdbc.stream.stage;
 
-import akka.japi.Procedure;
 import akka.stream.Attributes;
 import akka.stream.FlowShape;
 import akka.stream.Inlet;

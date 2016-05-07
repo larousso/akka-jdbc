@@ -1,5 +1,7 @@
 package com.adelegue.akka.jdbc.query;
 
+import akka.stream.ActorAttributes;
+import akka.stream.javadsl.Flow;
 import akka.stream.javadsl.Source;
 import com.adelegue.akka.jdbc.connection.SqlConnection;
 import com.adelegue.akka.jdbc.exceptions.ExceptionsHandler;
@@ -39,6 +41,7 @@ public abstract class AbstractQueryBuilder<T, Out> implements Query {
     final ResultSetExtractor<Out> resultSetExtractor;
 
     final Optional<Transaction> transaction;
+
 
     public AbstractQueryBuilder(String sql, Future<SqlContext> sqlContext, Integer resultSetType, Integer resultSetConcurrency, Integer resultSetHoldability, List<Object> params, Source<?, ?> depends, ResultSetExtractor<Out> resultSetExtractor, Optional<Transaction> transaction) {
         this.sqlContext = sqlContext;
@@ -117,6 +120,13 @@ public abstract class AbstractQueryBuilder<T, Out> implements Query {
 
     public T andRollback() {
         return constructor(sql, sqlContext, resultSetType, resultSetConcurrency, resultSetHoldability, params, depends, resultSetExtractor, Optional.of(Transaction.ROLLBACK));
+    }
+
+    protected  <Mat> Source<Out, Mat> applyDispatcher(Source<Out, Mat> aSource, Optional<String> dispatcher) {
+        return dispatcher.map(d -> aSource.withAttributes(ActorAttributes.dispatcher(d))).orElse(aSource);
+    }
+    public <In, Mat> Flow<In, Out, Mat> applyDispatcher(Flow<In, Out, Mat> aFlow, Optional<String> dispatcher) {
+        return dispatcher.map(d -> aFlow.withAttributes(ActorAttributes.dispatcher(d))).orElse(aFlow);
     }
 
     /*

@@ -1,10 +1,8 @@
 package com.adelegue.akka.jdbc.query;
 
-import akka.japi.Procedure;
 import akka.stream.javadsl.Flow;
 import com.adelegue.akka.jdbc.connection.SqlConnection;
 import com.adelegue.akka.jdbc.function.F;
-import com.adelegue.akka.jdbc.stream.stage.AtTheEndStage;
 import com.adelegue.akka.jdbc.stream.stage.OnEachStage;
 import scala.concurrent.Future;
 

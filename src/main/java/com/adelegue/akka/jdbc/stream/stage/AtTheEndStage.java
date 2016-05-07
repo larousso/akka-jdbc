@@ -9,12 +9,10 @@ import akka.stream.stage.*;
 import com.adelegue.akka.jdbc.connection.SqlConnection;
 import com.adelegue.akka.jdbc.stream.ResourcesHelper;
 import scala.compat.java8.FutureConverters;
-import scala.concurrent.ExecutionContext;
 import scala.concurrent.Future;
 
 import java.util.List;
 import java.util.concurrent.CompletionStage;
-import java.util.function.Consumer;
 
 /**
  * Created by adelegue on 30/04/2016.

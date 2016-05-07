@@ -1,6 +1,5 @@
 package com.adelegue.akka.jdbc.stream.stage;
 
-import akka.dispatch.OnComplete;
 import akka.stream.Attributes;
 import akka.stream.FlowShape;
 import akka.stream.Inlet;
@@ -10,8 +9,6 @@ import akka.stream.stage.AbstractOutHandler;
 import akka.stream.stage.GraphStage;
 import akka.stream.stage.GraphStageLogic;
 import com.adelegue.akka.jdbc.connection.SqlConnection;
-import scala.concurrent.ExecutionContext;
-import scala.concurrent.Future;
 
 /**
  * Created by adelegue on 30/04/2016.

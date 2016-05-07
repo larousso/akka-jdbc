@@ -9,9 +9,9 @@ import akka.stream.stage.AbstractOutHandler;
 import akka.stream.stage.GraphStage;
 import akka.stream.stage.GraphStageLogic;
 import com.adelegue.akka.jdbc.query.Query;
-import com.adelegue.akka.jdbc.stream.ResourcesHelper;
 import com.adelegue.akka.jdbc.query.SqlContext;
 import com.adelegue.akka.jdbc.query.Transaction;
+import com.adelegue.akka.jdbc.stream.ResourcesHelper;
 
 import java.sql.PreparedStatement;
 import java.sql.SQLException;

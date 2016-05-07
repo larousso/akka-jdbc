@@ -40,7 +40,7 @@ public class SelectQueryBuilder<Out> extends AbstractQueryBuilder<SelectQueryBui
 
     public Source<Out, ?> get() {
         Source<Out, NotUsed> querySource = Source.fromFuture(sqlContext).flatMapMerge(1, ctx ->
-                Source.fromGraph(new SelectQuerySource<>(ctx, this, resultSetExtractor, transaction))
+                applyDispatcher(Source.fromGraph(new SelectQuerySource<>(ctx, this, resultSetExtractor, transaction)), ctx.dispatcher)
         );
         if(depends != null) {
             return depends.fold(0, (acc, elt) -> acc + 1).flatMapMerge(1, i -> querySource);

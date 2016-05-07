@@ -3,7 +3,6 @@ package com.adelegue.akka.jdbc.query;
 import akka.stream.javadsl.Flow;
 import akka.stream.javadsl.Source;
 import com.adelegue.akka.jdbc.stream.source.UpdateQuerySource;
-import com.adelegue.akka.jdbc.stream.stage.UpdateQueryStage;
 import com.adelegue.akka.jdbc.utils.ResultSetExtractor;
 import scala.concurrent.Future;
 
@@ -37,7 +36,7 @@ public class UpdateQueryBuilder extends AbstractQueryBuilder<UpdateQueryBuilder,
     public Source<Integer, ?> count() {
 
         Source<Integer, ?> querySource = Source.fromFuture(sqlContext).flatMapMerge(1, ctx ->
-                Source.fromGraph(new UpdateQuerySource(ctx, this, transaction))
+                applyDispatcher(Source.fromGraph(new UpdateQuerySource(ctx, this, transaction)), ctx.dispatcher)
         );
         if(depends != null) {
             return depends.fold(0, (acc, elt) -> acc + 1).flatMapMerge(1, i -> querySource);
@@ -46,17 +45,11 @@ public class UpdateQueryBuilder extends AbstractQueryBuilder<UpdateQueryBuilder,
         }
     }
 
-    public <In> Flow<In, Integer, ?> toFlow() {
-        return Flow.<In>create().flatMapMerge(1, in -> Source.fromFuture(sqlContext)).via(Flow.fromGraph(new UpdateQueryStage(this)));
+    public <In> Flow<In, Integer, ?> grabInParams(Function<In, List<?>> convertParams) {
+        return Flow.<In>create().flatMapMerge(1, in -> this.params(convertParams.apply(in)).count());
     }
 
-
-    public <In, Out> Flow<In, Out, ?> takeInParams() {
-        return null;
+    public <In> Flow<In, Integer, ?> grabInParam(Function<In, ?> convertParams) {
+        return Flow.<In>create().flatMapMerge(1, in -> this.param(convertParams.apply(in)).count());
     }
-
-    public <In, Out, Params> Flow<In, Out, ?> takeInParams(Function<In, Params> convertParams) {
-        return null;
-    }
-
 }

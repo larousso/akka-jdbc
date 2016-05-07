@@ -2,6 +2,7 @@ package com.adelegue.akka.jdbc;
 
 import akka.actor.ActorSystem;
 import akka.japi.Procedure;
+import akka.stream.ActorAttributes;
 import akka.stream.javadsl.Flow;
 import akka.stream.javadsl.Source;
 import com.adelegue.akka.jdbc.connection.SqlConnection;
@@ -26,13 +27,13 @@ import static com.adelegue.akka.jdbc.utils.ScalaBridge.func;
  */
 public class Sql {
 
-    final Future<SqlConnection> connection;
+    private final Future<SqlConnection> connection;
 
-    final ActorSystem actorSystem;
+    private final ActorSystem actorSystem;
 
-    final Optional<String> dispatcher;
+    private final Optional<String> dispatcher;
 
-    final ExecutionContext executionContext;
+    private final ExecutionContext executionContext;
 
     Sql(Future<SqlConnection> connection, ActorSystem actorSystem, Optional<String> dispatcher) {
         this.connection = connection;
@@ -43,24 +44,18 @@ public class Sql {
 
     public Sql keepConnectionOpened() {
         Function1<SqlConnection, SqlConnection> func = func(c -> new SqlConnection(c.connection(), c.name(), true));
-        return new Sql(connection.map(func, this.executionContext), actorSystem, dispatcher);
-    }
-
-    public Sql withTransaction() {
-        return new Sql(connection.map(func(c -> {
-            handleChecked0(() -> c.connection().setAutoCommit(false));
-            return c;
-        }), this.executionContext), actorSystem, dispatcher);
+        Future<SqlConnection> connectionStayOpened = connection.map(func, this.executionContext);
+        return new Sql(connectionStayOpened, actorSystem, dispatcher);
     }
 
     //Sources
-
     public Source<SqlConnection, ?> connection() {
-        return Source.fromFuture(connection);
+        return applyDispatcher(Source.fromFuture(connection));
     }
 
     public SelectQueryBuilder<ResultSet> select(String query) {
-        return new SelectQueryBuilder<>(query, connection.map(func(c -> new SqlContext(actorSystem, c, Optional.empty())), this.executionContext), ResultSetExtractor.identity());
+        Function1<SqlConnection, SqlContext> func = func(c -> new SqlContext(actorSystem, c, Optional.empty()));
+        return new SelectQueryBuilder<>(query, connection.map(func, this.executionContext), ResultSetExtractor.identity());
     }
 
     public Source<SqlConnection, ?> beginTransaction() {
@@ -75,7 +70,7 @@ public class Sql {
     }
 
     public <T> Flow<T, T, ?> atTheEnd(ConnectionAction... handlers) {
-        return new AtTheEndBuilder(Arrays.asList(handlers), connection).apply();
+        return applyDispatcher(new AtTheEndBuilder(Arrays.asList(handlers), connection).apply());
     }
 
     public AtTheEndBuilder atTheEnd() {
@@ -83,12 +78,12 @@ public class Sql {
     }
 
     public <T> Flow<T, T, ?> doOnEachWithInParam(ConnectionBiAction<T>... handlers) {
-        return new DoOnEachBuilder<>(Arrays.asList(handlers), connection).apply();
+        return applyDispatcher(new DoOnEachBuilder<>(Arrays.asList(handlers), connection).apply());
     }
 
     public <T> Flow<T, T, ?> doOnEach(ConnectionAction... handlers) {
         List<F.BiConsumerUnchecked<T, SqlConnection>> collect = Arrays.asList(handlers).stream().map(e -> Sql.<T>toBiAction(e)).collect(Collectors.toList());
-        return new DoOnEachBuilder<>(collect, connection).apply();
+        return applyDispatcher(new DoOnEachBuilder<>(collect, connection).apply());
     }
 
     public DoOnEachBuilder doOnEach() {
@@ -105,10 +100,6 @@ public class Sql {
 
     public static <In, Out> Flow<In, Out, ?> andThen(SelectQueryBuilder<Out> builder) {
         return Flow.<In>create().flatMapMerge(1, in -> builder.get());
-    }
-
-    public static <In> Flow<In, Integer, ?> andThen(UpdateQueryBuilder builder) {
-        return Flow.<In>create().via(builder.toFlow());
     }
 
     public static <In, Out> Flow<In, Out, ?> andThen(UpdateQueryGeneratedKeyBuilder<Out> builder) {
@@ -191,4 +182,10 @@ public class Sql {
         return (any, sqlConnection) -> action.apply(sqlConnection);
     }
 
+    public <In, Out, Mat> Flow<In, Out, Mat> applyDispatcher(Flow<In, Out, Mat> aFlow) {
+        return dispatcher.map(d -> aFlow.withAttributes(ActorAttributes.dispatcher(d))).orElse(aFlow);
+    }
+    public <Out, Mat> Source<Out, Mat> applyDispatcher(Source<Out, Mat> aSource) {
+        return dispatcher.map(d -> aSource.withAttributes(ActorAttributes.dispatcher(d))).orElse(aSource);
+    }
 }

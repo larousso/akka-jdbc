@@ -1,15 +1,14 @@
 package com.adelegue.akka.jdbc;
 
 import akka.actor.ActorSystem;
-import com.adelegue.akka.jdbc.connection.ConnectionProvider;
-import com.adelegue.akka.jdbc.connection.DataSourceConnectionProvider;
-import com.adelegue.akka.jdbc.connection.SqlConnection;
-import com.adelegue.akka.jdbc.connection.UniqueConnectionProvider;
+import com.adelegue.akka.jdbc.connection.*;
+import com.zaxxer.hikari.HikariConfig;
 import scala.concurrent.Future;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.util.Optional;
+import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static com.adelegue.akka.jdbc.utils.AkkaUtils.getExecutionContext;
@@ -21,13 +20,13 @@ import static com.adelegue.akka.jdbc.utils.ScalaBridge.func;
 public class Database {
 
 
-    final ActorSystem actorSystem;
+    private final ActorSystem actorSystem;
 
-    final ConnectionProvider connectionProvider;
+    private final ConnectionProvider connectionProvider;
 
-    static final AtomicInteger connectionNumber = new AtomicInteger();
+    private static final AtomicInteger connectionNumber = new AtomicInteger();
 
-        final Optional<String> dispatcher;
+    private final Optional<String> dispatcher;
 
     public Database(ConnectionProvider connectionProvider, ActorSystem actorSystem, Optional<String> dispatcher) {
         this.connectionProvider = connectionProvider;
@@ -56,6 +55,18 @@ public class Database {
         return new Database(new UniqueConnectionProvider(new SqlConnection(connection, nameConnection(), false)), ActorSystem.create("Akka-Jdbc"), Optional.empty());
     }
 
+    public static Database from(Properties hikariConfig) {
+        return new Database(new HikariCpConnectionProvider(hikariConfig, ActorSystem.create("Akka-Jdbc"), Optional.empty()), ActorSystem.create("Akka-Jdbc"), Optional.empty());
+    }
+
+    public static Database from(HikariConfig hikariConfig) {
+        return new Database(new HikariCpConnectionProvider(hikariConfig, ActorSystem.create("Akka-Jdbc"), Optional.empty()), ActorSystem.create("Akka-Jdbc"), Optional.empty());
+    }
+
+    public static DatabaseBuilder builder() {
+        return new DatabaseBuilder();
+    }
+
     private static String nameConnection() {
         return String.format("AkkaJdbcConnection%d", connectionNumber.getAndIncrement());
     }
@@ -71,5 +82,71 @@ public class Database {
 
     public ActorSystem getActorSystem() {
         return actorSystem;
+    }
+
+    public static class DatabaseBuilder {
+
+        String url;
+        String username;
+        String password;
+        Integer minPoolSize;
+        Integer maxPoolSize;
+        Class dataSourceClass;
+        ActorSystem actorSystem;
+        String dispatcher;
+
+        public DatabaseBuilder withUrl(String url) {
+            this.url = url;
+            return this;
+        }
+
+        public DatabaseBuilder withUsername(String username) {
+            this.username = username;
+            return this;
+        }
+
+        public DatabaseBuilder withPassword(String password) {
+            this.password = password;
+            return this;
+        }
+
+        public DatabaseBuilder withMinPoolSize(Integer minPoolSize) {
+            this.minPoolSize = minPoolSize;
+            return this;
+        }
+
+        public DatabaseBuilder withMaxPoolSize(Integer maxPoolSize) {
+            this.maxPoolSize = maxPoolSize;
+            return this;
+        }
+
+        public DatabaseBuilder withDataSourceClass(Class dataSourceClass) {
+            this.dataSourceClass = dataSourceClass;
+            return this;
+        }
+
+        public DatabaseBuilder withActorSystem(ActorSystem actorSystem) {
+            this.actorSystem = actorSystem;
+            return this;
+        }
+
+        public DatabaseBuilder withDispatcher(String dispatcher) {
+            this.dispatcher = dispatcher;
+            return this;
+        }
+
+        public Database build() {
+            HikariConfig hikariConfig = new HikariConfig();
+            if(url != null) {
+                hikariConfig.setJdbcUrl(url);
+            }
+            hikariConfig.setDataSourceClassName(dataSourceClass.getName());
+            hikariConfig.setUsername(username);
+            hikariConfig.setPassword(password);
+            hikariConfig.setMinimumIdle(minPoolSize);
+            hikariConfig.setMaximumPoolSize(maxPoolSize);
+            return Database.from(hikariConfig);
+        }
+
     }
 }
