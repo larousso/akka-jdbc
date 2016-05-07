@@ -8,7 +8,7 @@ import akka.stream.javadsl.Source;
 import com.adelegue.akka.jdbc.connection.SqlConnection;
 import com.adelegue.akka.jdbc.function.F;
 import com.adelegue.akka.jdbc.query.*;
-import com.adelegue.akka.jdbc.utils.ResultSetExtractor;
+import com.adelegue.akka.jdbc.function.ResultSetExtractor;
 import scala.Function1;
 import scala.concurrent.ExecutionContext;
 import scala.concurrent.Future;

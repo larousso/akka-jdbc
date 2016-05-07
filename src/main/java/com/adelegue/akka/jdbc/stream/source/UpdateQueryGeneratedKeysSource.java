@@ -12,7 +12,7 @@ import com.adelegue.akka.jdbc.query.Query;
 import com.adelegue.akka.jdbc.query.SqlContext;
 import com.adelegue.akka.jdbc.query.Transaction;
 import com.adelegue.akka.jdbc.stream.ResourcesHelper;
-import com.adelegue.akka.jdbc.utils.ResultSetExtractor;
+import com.adelegue.akka.jdbc.function.ResultSetExtractor;
 
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;

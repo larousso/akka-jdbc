@@ -6,7 +6,7 @@ import akka.stream.ActorMaterializer;
 import akka.stream.javadsl.Sink;
 import akka.stream.javadsl.Source;
 import com.adelegue.akka.jdbc.connection.SqlConnection;
-import com.adelegue.akka.jdbc.utils.ResultSetExtractor;
+import com.adelegue.akka.jdbc.function.ResultSetExtractor;
 import org.h2.jdbc.JdbcSQLException;
 import org.junit.Test;
 import scala.concurrent.Await;

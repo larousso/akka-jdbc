@@ -4,7 +4,7 @@ import akka.NotUsed;
 import akka.stream.javadsl.Flow;
 import akka.stream.javadsl.Source;
 import com.adelegue.akka.jdbc.stream.source.SelectQuerySource;
-import com.adelegue.akka.jdbc.utils.ResultSetExtractor;
+import com.adelegue.akka.jdbc.function.ResultSetExtractor;
 import scala.concurrent.Future;
 
 import java.util.List;

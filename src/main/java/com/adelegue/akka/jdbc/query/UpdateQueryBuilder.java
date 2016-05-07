@@ -3,7 +3,7 @@ package com.adelegue.akka.jdbc.query;
 import akka.stream.javadsl.Flow;
 import akka.stream.javadsl.Source;
 import com.adelegue.akka.jdbc.stream.source.UpdateQuerySource;
-import com.adelegue.akka.jdbc.utils.ResultSetExtractor;
+import com.adelegue.akka.jdbc.function.ResultSetExtractor;
 import scala.concurrent.Future;
 
 import java.sql.ResultSet;

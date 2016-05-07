@@ -3,7 +3,7 @@ package com.adelegue.akka.jdbc;
 import akka.japi.Pair;
 import akka.japi.tuple.Tuple3;
 import akka.japi.tuple.Tuple4;
-import com.adelegue.akka.jdbc.utils.ResultSetExtractor;
+import com.adelegue.akka.jdbc.function.ResultSetExtractor;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;

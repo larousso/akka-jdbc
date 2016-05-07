@@ -1,4 +1,4 @@
-package com.adelegue.akka.jdbc.utils;
+package com.adelegue.akka.jdbc.function;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
