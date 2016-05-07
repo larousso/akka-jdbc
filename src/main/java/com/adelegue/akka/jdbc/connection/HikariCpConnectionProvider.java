@@ -3,6 +3,7 @@ package com.adelegue.akka.jdbc.connection;
 import akka.actor.ActorSystem;
 import akka.dispatch.Futures;
 import com.adelegue.akka.jdbc.exceptions.ExceptionsHandler;
+import com.adelegue.akka.jdbc.utils.AkkaUtils;
 import com.zaxxer.hikari.HikariConfig;
 import com.zaxxer.hikari.HikariDataSource;
 import scala.concurrent.ExecutionContext;
@@ -17,33 +18,32 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public class HikariCpConnectionProvider implements ConnectionProvider {
 
-    final HikariDataSource hikariDataSource;
+    private final HikariDataSource hikariDataSource;
 
-    final AtomicInteger connectionNumber = new AtomicInteger();
+    private final AtomicInteger connectionNumber = new AtomicInteger();
 
-    final ActorSystem actorSystem;
+    private final ActorSystem actorSystem;
 
-    final Optional<String> dispatcher;
+    private final String dispatcher;
 
-    public HikariCpConnectionProvider(HikariDataSource hikariDataSource, ActorSystem actorSystem, Optional<String> dispatcher) {
+    public HikariCpConnectionProvider(HikariDataSource hikariDataSource, ActorSystem actorSystem, String dispatcher) {
         this.hikariDataSource = hikariDataSource;
         this.actorSystem = actorSystem;
         this.dispatcher = dispatcher;
     }
 
-    public HikariCpConnectionProvider(HikariConfig hikariConfig, ActorSystem actorSystem, Optional<String> dispatcher) {
+    public HikariCpConnectionProvider(HikariConfig hikariConfig, ActorSystem actorSystem, String dispatcher) {
         this(new HikariDataSource(hikariConfig), actorSystem, dispatcher);
     }
 
-    public HikariCpConnectionProvider(Properties hikariConfig, ActorSystem actorSystem, Optional<String> dispatcher) {
+    public HikariCpConnectionProvider(Properties hikariConfig, ActorSystem actorSystem, String dispatcher) {
         this(new HikariConfig(hikariConfig), actorSystem, dispatcher);
     }
 
     @Override
     public Future<SqlConnection> getConnection() {
-        Optional<ExecutionContext> messageDispatcher = dispatcher.map(actorSystem.dispatchers()::lookup);
         return Futures.future(() ->
                         ExceptionsHandler.handleChecked(() -> new SqlConnection(hikariDataSource.getConnection(), "AkkaJdbcConnection" + connectionNumber.getAndIncrement(), false))
-                , messageDispatcher.orElse(actorSystem.dispatcher()));
+                , AkkaUtils.getExecutionContext(actorSystem, Optional.ofNullable(dispatcher)));
     }
 }

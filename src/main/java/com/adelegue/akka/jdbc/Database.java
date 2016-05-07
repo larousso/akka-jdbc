@@ -2,6 +2,8 @@ package com.adelegue.akka.jdbc;
 
 import akka.actor.ActorSystem;
 import com.adelegue.akka.jdbc.connection.*;
+import com.typesafe.config.Config;
+import com.typesafe.config.ConfigFactory;
 import com.zaxxer.hikari.HikariConfig;
 import scala.concurrent.Future;
 
@@ -19,6 +21,7 @@ import static com.adelegue.akka.jdbc.utils.ScalaBridge.func;
  */
 public class Database {
 
+    private static final String DEFAULT_DISPATCHER = "akka.jdbc-dispatcher";
 
     private final ActorSystem actorSystem;
 
@@ -26,41 +29,65 @@ public class Database {
 
     private static final AtomicInteger connectionNumber = new AtomicInteger();
 
-    private final Optional<String> dispatcher;
+    private final String dispatcher;
 
-    public Database(ConnectionProvider connectionProvider, ActorSystem actorSystem, Optional<String> dispatcher) {
+
+    public Database(ConnectionProvider connectionProvider, ActorSystem actorSystem) {
+        this(connectionProvider, actorSystem, DEFAULT_DISPATCHER);
+    }
+
+    public Database(ConnectionProvider connectionProvider, String dispatcher, Integer threadPoolSize) {
+        this(connectionProvider, defaultSystem(threadPoolSize), dispatcher);
+    }
+
+    public Database(ConnectionProvider connectionProvider, ActorSystem actorSystem, String dispatcher) {
         this.connectionProvider = connectionProvider;
         this.actorSystem = actorSystem;
         this.dispatcher = dispatcher;
     }
 
-    public static Database from(DataSource dataSource, ActorSystem actorSystem, Optional<String> dispatcher) {
+    public static Database from(DataSource dataSource, ActorSystem actorSystem, String dispatcher) {
         return new Database(new DataSourceConnectionProvider(dataSource, actorSystem, dispatcher), actorSystem, dispatcher);
     }
 
     public static Database from(DataSource dataSource, ActorSystem actorSystem) {
-        return new Database(new DataSourceConnectionProvider(dataSource, actorSystem, Optional.empty()), actorSystem, Optional.empty());
+        return from(dataSource, actorSystem, DEFAULT_DISPATCHER);
+    }
+
+    public static Database from(DataSource dataSource, Integer threadPoolSize) {
+        return from(dataSource, defaultSystem(threadPoolSize));
     }
 
     public static Database from(DataSource dataSource) {
-        ActorSystem actorSystem = ActorSystem.create("Akka-Jdbc");
-        return new Database(new DataSourceConnectionProvider(dataSource, actorSystem, Optional.empty()), actorSystem, Optional.empty());
+        return from(dataSource, (Integer) null);
     }
 
     public static Database from(Connection connection, ActorSystem actorSystem) {
-        return new Database(new UniqueConnectionProvider(new SqlConnection(connection, nameConnection(), false)), actorSystem, Optional.empty());
+        return new Database(new UniqueConnectionProvider(new SqlConnection(connection, nameConnection(), false)), actorSystem, DEFAULT_DISPATCHER);
     }
 
     public static Database from(Connection connection) {
-        return new Database(new UniqueConnectionProvider(new SqlConnection(connection, nameConnection(), false)), ActorSystem.create("Akka-Jdbc"), Optional.empty());
+        return from(connection, defaultSystem());
     }
 
     public static Database from(Properties hikariConfig) {
-        return new Database(new HikariCpConnectionProvider(hikariConfig, ActorSystem.create("Akka-Jdbc"), Optional.empty()), ActorSystem.create("Akka-Jdbc"), Optional.empty());
+        return from(new HikariConfig(hikariConfig));
+    }
+
+    public static Database from(Properties hikariConfig, Integer threadPoolSize, String dispatcher) {
+        return from(new HikariConfig(hikariConfig), threadPoolSize, dispatcher);
     }
 
     public static Database from(HikariConfig hikariConfig) {
-        return new Database(new HikariCpConnectionProvider(hikariConfig, ActorSystem.create("Akka-Jdbc"), Optional.empty()), ActorSystem.create("Akka-Jdbc"), Optional.empty());
+        return from(hikariConfig, defaultSystem(), DEFAULT_DISPATCHER);
+    }
+
+    public static Database from(HikariConfig hikariConfig, Integer threadPoolSize, String dispatcher) {
+        return from(hikariConfig, defaultSystem(threadPoolSize), dispatcher);
+    }
+
+    public static Database from(HikariConfig hikariConfig, ActorSystem actorSystem, String dispatcher) {
+        return new Database(new HikariCpConnectionProvider(hikariConfig, actorSystem, dispatcher), actorSystem, dispatcher);
     }
 
     public static DatabaseBuilder builder() {
@@ -76,12 +103,26 @@ public class Database {
     }
 
     public Sql sql(Boolean keepConnectionOpened) {
-        Future<SqlConnection> connection = connectionProvider.getConnection().map(func(c -> new SqlConnection(c.connection(), c.name(), true)), getExecutionContext(actorSystem, dispatcher));
+        Future<SqlConnection> connection = connectionProvider.getConnection().map(func(c -> new SqlConnection(c.connection(), c.name(), true)), getExecutionContext(actorSystem, Optional.ofNullable(dispatcher)));
         return new Sql(connection, actorSystem, this.dispatcher);
     }
 
     public ActorSystem getActorSystem() {
         return actorSystem;
+    }
+
+
+    private static ActorSystem defaultSystem() {
+        return defaultSystem(null);
+    }
+
+    private static ActorSystem defaultSystem(Integer threadPoolSize) {
+        if(threadPoolSize != null) {
+            Config config = ConfigFactory.parseString("akka.jdbc-dispatcher.thread-pool-executor.fixed-pool-size = "+threadPoolSize);
+            return ActorSystem.create("Akka-Jdbc", config);
+        } else {
+            return ActorSystem.create("Akka-Jdbc");
+        }
     }
 
     public static class DatabaseBuilder {
@@ -94,6 +135,7 @@ public class Database {
         Class dataSourceClass;
         ActorSystem actorSystem;
         String dispatcher;
+        Integer threadPoolSize;
 
         public DatabaseBuilder withUrl(String url) {
             this.url = url;
@@ -135,6 +177,11 @@ public class Database {
             return this;
         }
 
+        public DatabaseBuilder withThreadPoolSize(Integer threadPoolSize) {
+            this.threadPoolSize = threadPoolSize;
+            return this;
+        }
+
         public Database build() {
             HikariConfig hikariConfig = new HikariConfig();
             if(url != null) {
@@ -145,7 +192,7 @@ public class Database {
             hikariConfig.setPassword(password);
             hikariConfig.setMinimumIdle(minPoolSize);
             hikariConfig.setMaximumPoolSize(maxPoolSize);
-            return Database.from(hikariConfig);
+            return Database.from(hikariConfig, threadPoolSize, dispatcher);
         }
 
     }

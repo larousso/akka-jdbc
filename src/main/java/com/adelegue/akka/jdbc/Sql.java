@@ -2,13 +2,12 @@ package com.adelegue.akka.jdbc;
 
 import akka.actor.ActorSystem;
 import akka.japi.Procedure;
-import akka.stream.ActorAttributes;
 import akka.stream.javadsl.Flow;
 import akka.stream.javadsl.Source;
 import com.adelegue.akka.jdbc.connection.SqlConnection;
 import com.adelegue.akka.jdbc.function.F;
-import com.adelegue.akka.jdbc.query.*;
 import com.adelegue.akka.jdbc.function.ResultSetExtractor;
+import com.adelegue.akka.jdbc.query.*;
 import scala.Function1;
 import scala.concurrent.ExecutionContext;
 import scala.concurrent.Future;
@@ -19,6 +18,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static com.adelegue.akka.jdbc.exceptions.ExceptionsHandler.handleChecked0;
+import static com.adelegue.akka.jdbc.utils.AkkaUtils.applyDispatcher;
 import static com.adelegue.akka.jdbc.utils.AkkaUtils.getExecutionContext;
 import static com.adelegue.akka.jdbc.utils.ScalaBridge.func;
 
@@ -31,15 +31,15 @@ public class Sql {
 
     private final ActorSystem actorSystem;
 
-    private final Optional<String> dispatcher;
+    private final String dispatcher;
 
     private final ExecutionContext executionContext;
 
-    Sql(Future<SqlConnection> connection, ActorSystem actorSystem, Optional<String> dispatcher) {
+    Sql(Future<SqlConnection> connection, ActorSystem actorSystem, String dispatcher) {
         this.connection = connection;
         this.actorSystem = actorSystem;
         this.dispatcher = dispatcher;
-        this.executionContext = getExecutionContext(actorSystem, dispatcher);
+        this.executionContext = getExecutionContext(actorSystem, Optional.ofNullable(dispatcher));
     }
 
     public Sql keepConnectionOpened() {
@@ -50,7 +50,7 @@ public class Sql {
 
     //Sources
     public Source<SqlConnection, ?> connection() {
-        return applyDispatcher(Source.fromFuture(connection));
+        return applyDispatcher(Source.fromFuture(connection), dispatcher);
     }
 
     public SelectQueryBuilder<ResultSet> select(String query) {
@@ -70,7 +70,7 @@ public class Sql {
     }
 
     public <T> Flow<T, T, ?> atTheEnd(ConnectionAction... handlers) {
-        return applyDispatcher(new AtTheEndBuilder(Arrays.asList(handlers), connection).apply());
+        return applyDispatcher(new AtTheEndBuilder(Arrays.asList(handlers), connection).apply(), dispatcher);
     }
 
     public AtTheEndBuilder atTheEnd() {
@@ -78,12 +78,12 @@ public class Sql {
     }
 
     public <T> Flow<T, T, ?> doOnEachWithInParam(ConnectionBiAction<T>... handlers) {
-        return applyDispatcher(new DoOnEachBuilder<>(Arrays.asList(handlers), connection).apply());
+        return applyDispatcher(new DoOnEachBuilder<>(Arrays.asList(handlers), connection).apply(), dispatcher);
     }
 
     public <T> Flow<T, T, ?> doOnEach(ConnectionAction... handlers) {
         List<F.BiConsumerUnchecked<T, SqlConnection>> collect = Arrays.asList(handlers).stream().map(e -> Sql.<T>toBiAction(e)).collect(Collectors.toList());
-        return applyDispatcher(new DoOnEachBuilder<>(collect, connection).apply());
+        return applyDispatcher(new DoOnEachBuilder<>(collect, connection).apply(), dispatcher);
     }
 
     public DoOnEachBuilder doOnEach() {
@@ -176,16 +176,10 @@ public class Sql {
     }
 
     public interface ConnectionAction extends Procedure<SqlConnection> {}
+
     public interface ConnectionBiAction<T> extends F.BiConsumerUnchecked<T, SqlConnection> {}
 
     static <T> ConnectionBiAction<T> toBiAction(ConnectionAction action) {
         return (any, sqlConnection) -> action.apply(sqlConnection);
-    }
-
-    public <In, Out, Mat> Flow<In, Out, Mat> applyDispatcher(Flow<In, Out, Mat> aFlow) {
-        return dispatcher.map(d -> aFlow.withAttributes(ActorAttributes.dispatcher(d))).orElse(aFlow);
-    }
-    public <Out, Mat> Source<Out, Mat> applyDispatcher(Source<Out, Mat> aSource) {
-        return dispatcher.map(d -> aSource.withAttributes(ActorAttributes.dispatcher(d))).orElse(aSource);
     }
 }

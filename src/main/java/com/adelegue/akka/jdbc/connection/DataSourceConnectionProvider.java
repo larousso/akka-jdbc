@@ -21,9 +21,9 @@ public class DataSourceConnectionProvider implements ConnectionProvider {
 
     final ActorSystem actorSystem;
 
-    final Optional<String> dispatcher;
+    final String dispatcher;
 
-    public DataSourceConnectionProvider(DataSource dataSource, ActorSystem actorSystem, Optional<String> dispatcher) {
+    public DataSourceConnectionProvider(DataSource dataSource, ActorSystem actorSystem, String dispatcher) {
         this.dataSource = dataSource;
         this.actorSystem = actorSystem;
         this.dispatcher = dispatcher;
@@ -31,7 +31,7 @@ public class DataSourceConnectionProvider implements ConnectionProvider {
 
     @Override
     public Future<SqlConnection> getConnection() {
-        Optional<ExecutionContext> messageDispatcher = dispatcher.map(actorSystem.dispatchers()::lookup);
+        Optional<ExecutionContext> messageDispatcher = Optional.ofNullable(dispatcher).map(actorSystem.dispatchers()::lookup);
         return Futures.future(() ->
                 ExceptionsHandler.handleChecked(() -> new SqlConnection(dataSource.getConnection(), "AkkaJdbcConnection" + connectionNumber.getAndIncrement(), false))
         , messageDispatcher.orElse(actorSystem.dispatcher()));

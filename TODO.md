@@ -1,12 +1,8 @@
 #TODO : 
 
-* Meilleur gestion des connexions 
-
-* Add hikariCp and Database.fromUrl(url) builder
+* Better connection handling 
  
-* Add separate dispatcher on Akka streams and akka configuration
- 
-* More test on transactions ...
+* More test
 
 * Tests multi threading and performances 
 
