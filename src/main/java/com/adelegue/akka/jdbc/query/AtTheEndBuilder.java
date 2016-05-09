@@ -20,10 +20,10 @@ public class AtTheEndBuilder {
     private final Future<SqlConnection> sqlConnection;
 
 
-    public AtTheEndBuilder(Procedure<SqlConnection> handler, Future<SqlConnection> sqlConnection) {
-        this.handlers = Collections.singletonList(handler);
-        this.sqlConnection = sqlConnection;
-    }
+//    public AtTheEndBuilder(Procedure<SqlConnection> handler, Future<SqlConnection> sqlConnection) {
+//        this.handlers = Collections.singletonList(handler);
+//        this.sqlConnection = sqlConnection;
+//    }
 
     public AtTheEndBuilder(List<Procedure<SqlConnection>> handlers, Future<SqlConnection> sqlConnection) {
         this.handlers = handlers;

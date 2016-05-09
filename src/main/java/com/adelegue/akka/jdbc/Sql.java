@@ -2,6 +2,8 @@ package com.adelegue.akka.jdbc;
 
 import akka.actor.ActorSystem;
 import akka.japi.Procedure;
+import akka.stream.Graph;
+import akka.stream.SourceShape;
 import akka.stream.javadsl.Flow;
 import akka.stream.javadsl.Source;
 import com.adelegue.akka.jdbc.connection.SqlConnection;
@@ -14,6 +16,7 @@ import scala.concurrent.Future;
 
 import java.sql.ResultSet;
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -100,6 +103,10 @@ public class Sql {
 
     public static <In, Out> Flow<In, Out, ?> andThen(SelectQueryBuilder<Out> builder) {
         return Flow.<In>create().flatMapMerge(1, in -> builder.get());
+    }
+
+    public static <In, Out> Flow<In, Out, ?> andThen(Function<In, Source<Out, ?>> toExecute) {
+        return Flow.<In>create().flatMapMerge(1, toExecute::apply);
     }
 
     public static <In, Out> Flow<In, Out, ?> andThen(UpdateQueryGeneratedKeyBuilder<Out> builder) {

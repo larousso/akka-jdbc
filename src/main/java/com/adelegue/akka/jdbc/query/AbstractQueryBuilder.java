@@ -98,7 +98,7 @@ public abstract class AbstractQueryBuilder<T, Out> implements Query {
         return constructor(sql, sqlContext, resultSetType, resultSetConcurrency, resultSetHoldability, params, depends, resultSetExtractor, transaction);
     }
 
-    public T params(List<Object> params) {
+    public T paramsList(List<Object> params) {
         return constructor(sql, sqlContext, resultSetType, resultSetConcurrency, resultSetHoldability, params, depends, resultSetExtractor, transaction);
     }
 

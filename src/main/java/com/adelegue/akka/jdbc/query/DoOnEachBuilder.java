@@ -20,10 +20,10 @@ public class DoOnEachBuilder<T> {
     private final Future<SqlConnection> sqlConnection;
 
 
-    public DoOnEachBuilder(F.BiConsumerUnchecked<T, SqlConnection> handler, Future<SqlConnection> sqlConnection) {
-        this.handlers = Collections.singletonList(handler);
-        this.sqlConnection = sqlConnection;
-    }
+//    public DoOnEachBuilder(F.BiConsumerUnchecked<T, SqlConnection> handler, Future<SqlConnection> sqlConnection) {
+//        this.handlers = Collections.singletonList(handler);
+//        this.sqlConnection = sqlConnection;
+//    }
 
     public DoOnEachBuilder(List<F.BiConsumerUnchecked<T, SqlConnection>> handlers, Future<SqlConnection> sqlConnection) {
         this.handlers = handlers;

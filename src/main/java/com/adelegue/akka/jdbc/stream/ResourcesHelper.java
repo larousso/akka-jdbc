@@ -8,10 +8,12 @@ import java.sql.Statement;
 import java.util.Optional;
 
 /**
+ * Mixin to handle jdbc resources.
+ *
  * Created by adelegue on 01/05/2016.
  */
+@SuppressWarnings("OptionalUsedAsFieldOrParameterType")
 public interface ResourcesHelper {
-
 
     default void commit(SqlConnection sqlConnection, Optional<Transaction> transaction, Boolean onError) throws SQLException {
         //On error and transaction or rollback required => rollback
@@ -42,9 +44,11 @@ public interface ResourcesHelper {
                 } else {
                     commit(sqlConnection, transaction, onError);
                 }
+            } catch (SQLException e) {
+                sqlConnection.close();
             } finally {
-                if(!sqlConnection.keepOpen() && sqlConnection.connection() != null && !sqlConnection.connection().isClosed()) {
-                    sqlConnection.connection().close();
+                if(!sqlConnection.keepOpen()) {
+                    sqlConnection.close();
                 }
             }
         }

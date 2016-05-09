@@ -1,21 +1,26 @@
 package com.adelegue.akka.jdbc;
 
 
+import akka.japi.Pair;
 import akka.japi.tuple.Tuple4;
 import akka.stream.ActorMaterializer;
 import akka.stream.javadsl.Sink;
 import akka.stream.javadsl.Source;
+import com.adelegue.akka.jdbc.DbUtils.City;
+import com.adelegue.akka.jdbc.DbUtils.Superhero;
 import com.adelegue.akka.jdbc.connection.SqlConnection;
-import com.adelegue.akka.jdbc.function.ResultSetExtractor;
 import org.h2.jdbc.JdbcSQLException;
 import org.junit.Test;
 import scala.concurrent.Await;
 import scala.concurrent.Future;
 import scala.concurrent.duration.Duration;
 
+import javax.sql.DataSource;
 import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -261,7 +266,34 @@ public class DatabaseTest {
                 .get();
         assertThat(superheros.size()).isEqualTo(1);
         assertThat(superheros).contains(new Superhero(4, "one punch man", 20, 1));
+    }
 
+
+    @Test
+    public void insert_with_in_params() throws ExecutionException, InterruptedException {
+        Pair<DataSource, String> datasetAndGetDatasource = DbUtils.createDatasetAndGetDatasource();
+        Database database = Database.builder()
+                .withUrl(datasetAndGetDatasource.second())
+                .withUsername("user")
+                .withPassword("password")
+                .build();
+        ActorMaterializer materializer = ActorMaterializer.create(database.getActorSystem());
+
+        List<Integer> resultSets = Source.range(4, 53)
+                .map(i -> Pair.create(i, "name" + i))
+                .via(Sql.andThen( pair ->
+                    database
+                            .sql()
+                            .update("insert into city(city_id, name) values (?, ?)")
+                            .params(pair.first(), pair.second())
+                            .count()
+                ))
+                .runWith(Sink.seq(), materializer)
+                .toCompletableFuture()
+                .get();
+
+        Integer sum = resultSets.stream().reduce(0, (acc, elt) -> acc + elt);
+        assertThat(sum).isEqualTo(50);
     }
 
     @Test
@@ -293,7 +325,7 @@ public class DatabaseTest {
         Database database = DbUtils.pooledDb();
 
         ActorMaterializer materializer = ActorMaterializer.create(database.getActorSystem());
-        Sql sql = database.sql(true);
+        Sql sql = database.sql().keepConnectionOpened();
 
         Source<City, ?> cities = sql
                 .select("select * from superhero")
@@ -333,17 +365,18 @@ public class DatabaseTest {
 
         sql
                 .beginTransaction()
-                .via(andThen(sql.update("insert into superhero(name, puissance, city_id) values (?, ?, ?) ")
+                .via(andThen(any ->
+                        sql.update("insert into superhero(name, puissance, city_id) values (?, ?, ?) ")
                         .params("one punch man", 20, 1)
                         .count()
                 ))
                 .via(sql.doOnEachWithInParam(
                         Sql.doAndCommit(i -> System.out.println("Generated id = " + i)))
                 )
-                .via(sql.atTheEnd(
-                        Sql.endTransaction(),
-                        Sql.closeConnection()
-                    ))
+                .via(sql.atTheEnd()
+                        .then(Sql.endTransaction()).and(Sql.closeConnection())
+                        .apply()
+                )
                 .runWith(Sink.head(), materializer)
                 .toCompletableFuture()
                 .get();
@@ -370,7 +403,8 @@ public class DatabaseTest {
 
         sql
                 .beginTransaction()
-                .via(andThen(sql.update("insert into superhero(name, puissance, city_id) values (?, ?, ?) ")
+                .via(andThen(any ->
+                    sql.update("insert into superhero(name, puissance, city_id) values (?, ?, ?) ")
                         .params("one punch man", 20, 1)
                         .andRollback()
                         .count()
@@ -392,92 +426,5 @@ public class DatabaseTest {
     }
 
 
-
-    private static class City {
-        final Integer id;
-        final String name;
-
-        City(Integer id, String name) {
-            this.id = id;
-            this.name = name;
-        }
-
-        static City of(Integer id, String name) {
-            return new City(id, name);
-        }
-
-        static City convert(ResultSet rs) throws SQLException {
-            return new City(rs.getInt(1), rs.getString(2));
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            City city = (City) o;
-            return Objects.equals(id, city.id) &&
-                    Objects.equals(name, city.name);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(id, name);
-        }
-
-        @Override
-        public String toString() {
-            return "City{" +
-                    "id=" + id +
-                    ", name='" + name + '\'' +
-                    '}';
-        }
-    }
-
-    private static class Superhero {
-        final Integer id;
-        final String name;
-        final Integer puissance;
-        final Integer city_id;
-
-        Superhero(Integer id, String name, Integer puissance, Integer city_id) {
-            this.id = id;
-            this.name = name;
-            this.puissance = puissance;
-            this.city_id = city_id;
-        }
-
-        static Superhero convert(ResultSet rs) throws SQLException {
-            return new Superhero(rs.getInt(1), rs.getString(2), rs.getInt(3), rs.getInt(4));
-        }
-
-        static ResultSetExtractor<Superhero> as() {
-            return rs -> new Superhero(rs.getInt(1), rs.getString(2), rs.getInt(3), rs.getInt(4));
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (obj instanceof Superhero) {
-                Superhero other = Superhero.class.cast(obj);
-                return Objects.equals(name, other.name);
-            } else {
-                return false;
-            }
-        }
-
-        @Override
-        public String toString() {
-            return "Superhero{" +
-                    "id=" + id +
-                    ", name='" + name + '\'' +
-                    ", puissance=" + puissance +
-                    ", city_id=" + city_id +
-                    '}';
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hashCode(name);
-        }
-    }
 
 }

@@ -45,8 +45,9 @@ public class UpdateQueryBuilder extends AbstractQueryBuilder<UpdateQueryBuilder,
         }
     }
 
-    public <In> Flow<In, Integer, ?> grabInParams(Function<In, List<?>> convertParams) {
-        return Flow.<In>create().flatMapMerge(1, in -> this.params(convertParams.apply(in)).count());
+    public <In> Flow<In, Integer, ?> grabInParams(Function<In, List<Object>> convertParams) {
+
+        return Flow.<In>create().flatMapMerge(1, in -> this.paramsList(convertParams.apply(in)).count());
     }
 
     public <In> Flow<In, Integer, ?> grabInParam(Function<In, ?> convertParams) {

@@ -12,6 +12,7 @@ import java.sql.Connection;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Consumer;
 
 import static com.adelegue.akka.jdbc.utils.AkkaUtils.getExecutionContext;
 import static com.adelegue.akka.jdbc.utils.ScalaBridge.func;
@@ -31,19 +32,10 @@ public class Database {
 
     private final String dispatcher;
 
-
-    public Database(ConnectionProvider connectionProvider, ActorSystem actorSystem) {
-        this(connectionProvider, actorSystem, DEFAULT_DISPATCHER);
-    }
-
-    public Database(ConnectionProvider connectionProvider, String dispatcher, Integer threadPoolSize) {
-        this(connectionProvider, defaultSystem(threadPoolSize), dispatcher);
-    }
-
-    public Database(ConnectionProvider connectionProvider, ActorSystem actorSystem, String dispatcher) {
+    private Database(ConnectionProvider connectionProvider, ActorSystem actorSystem, String dispatcher) {
         this.connectionProvider = connectionProvider;
         this.actorSystem = actorSystem;
-        this.dispatcher = dispatcher;
+        this.dispatcher = Optional.ofNullable(dispatcher).orElse(DEFAULT_DISPATCHER);
     }
 
     public static Database from(DataSource dataSource, ActorSystem actorSystem, String dispatcher) {
@@ -54,12 +46,16 @@ public class Database {
         return from(dataSource, actorSystem, DEFAULT_DISPATCHER);
     }
 
-    public static Database from(DataSource dataSource, Integer threadPoolSize) {
-        return from(dataSource, defaultSystem(threadPoolSize));
+    public static Database from(DataSource dataSource, String dispatcher, Integer threadPoolSize) {
+        return from(dataSource, defaultSystem(threadPoolSize), dispatcher);
     }
 
     public static Database from(DataSource dataSource) {
-        return from(dataSource, (Integer) null);
+        return from(dataSource, null, (Integer) null);
+    }
+
+    public static Database from(Connection connection, String dispatcher, Integer threadPoolsize) {
+        return new Database(new UniqueConnectionProvider(new SqlConnection(connection, nameConnection(), false)), defaultSystem(threadPoolsize), dispatcher);
     }
 
     public static Database from(Connection connection, ActorSystem actorSystem) {
@@ -74,15 +70,15 @@ public class Database {
         return from(new HikariConfig(hikariConfig));
     }
 
-    public static Database from(Properties hikariConfig, Integer threadPoolSize, String dispatcher) {
-        return from(new HikariConfig(hikariConfig), threadPoolSize, dispatcher);
+    public static Database from(Properties hikariConfig, String dispatcher, Integer threadPoolSize) {
+        return from(new HikariConfig(hikariConfig), dispatcher, threadPoolSize);
     }
 
     public static Database from(HikariConfig hikariConfig) {
         return from(hikariConfig, defaultSystem(), DEFAULT_DISPATCHER);
     }
 
-    public static Database from(HikariConfig hikariConfig, Integer threadPoolSize, String dispatcher) {
+    public static Database from(HikariConfig hikariConfig, String dispatcher, Integer threadPoolSize) {
         return from(hikariConfig, defaultSystem(threadPoolSize), dispatcher);
     }
 
@@ -100,11 +96,6 @@ public class Database {
 
     public Sql sql() {
         return new Sql(connectionProvider.getConnection(), actorSystem, this.dispatcher);
-    }
-
-    public Sql sql(Boolean keepConnectionOpened) {
-        Future<SqlConnection> connection = connectionProvider.getConnection().map(func(c -> new SqlConnection(c.connection(), c.name(), true)), getExecutionContext(actorSystem, Optional.ofNullable(dispatcher)));
-        return new Sql(connection, actorSystem, this.dispatcher);
     }
 
     public ActorSystem getActorSystem() {
@@ -127,15 +118,16 @@ public class Database {
 
     public static class DatabaseBuilder {
 
-        String url;
-        String username;
-        String password;
-        Integer minPoolSize;
-        Integer maxPoolSize;
-        Class dataSourceClass;
-        ActorSystem actorSystem;
-        String dispatcher;
-        Integer threadPoolSize;
+        private String url;
+        private String username;
+        private String password;
+        private Integer minPoolSize;
+        private Integer maxPoolSize;
+        private Class dataSourceClass;
+        private ActorSystem actorSystem;
+        private String dispatcher;
+        private Integer threadPoolSize;
+        private HikariConfig hikariConfig;
 
         public DatabaseBuilder withUrl(String url) {
             this.url = url;
@@ -182,17 +174,32 @@ public class Database {
             return this;
         }
 
+        public DatabaseBuilder withHikariConfig(HikariConfig hikariConfig) {
+            this.hikariConfig = hikariConfig;
+            return this;
+        }
+
         public Database build() {
+            HikariConfig hikariConfig = Optional.ofNullable(this.hikariConfig).orElse(buildHikariConfig());
+            return Optional
+                    .ofNullable(actorSystem).map(system -> Database.from(hikariConfig, system, dispatcher))
+                    .orElse(Database.from(hikariConfig, dispatcher, threadPoolSize));
+
+        }
+
+        private HikariConfig buildHikariConfig() {
             HikariConfig hikariConfig = new HikariConfig();
-            if(url != null) {
-                hikariConfig.setJdbcUrl(url);
-            }
-            hikariConfig.setDataSourceClassName(dataSourceClass.getName());
-            hikariConfig.setUsername(username);
-            hikariConfig.setPassword(password);
-            hikariConfig.setMinimumIdle(minPoolSize);
-            hikariConfig.setMaximumPoolSize(maxPoolSize);
-            return Database.from(hikariConfig, threadPoolSize, dispatcher);
+            apply(url, hikariConfig::setJdbcUrl);
+            Optional.ofNullable(dataSourceClass).map(Class::getName).ifPresent(hikariConfig::setDataSourceClassName);
+            apply(username, hikariConfig::setUsername);
+            apply(password, hikariConfig::setPassword);
+            apply(minPoolSize, hikariConfig::setMinimumIdle);
+            apply(maxPoolSize, hikariConfig::setMaximumPoolSize);
+            return hikariConfig;
+        }
+
+        private <T> void apply(T value, Consumer<T> consumer) {
+            Optional.ofNullable(value).ifPresent(consumer);
         }
 
     }

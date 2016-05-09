@@ -1,12 +1,16 @@
 package com.adelegue.akka.jdbc;
 
+import akka.japi.Pair;
 import com.adelegue.akka.jdbc.exceptions.SqlException;
 import com.adelegue.akka.jdbc.exceptions.ExceptionsHandler;
+import com.adelegue.akka.jdbc.function.ResultSetExtractor;
 import org.h2.jdbcx.JdbcConnectionPool;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -21,18 +25,24 @@ public class DbUtils {
     }
 
     public static Database pooledDb() {
-        DataSource ds = JdbcConnectionPool.create(nextDbUrl(), "user", "password");
-        createTables(ds);
-        return Database.from(ds);
+        return Database.from(createDatasetAndGetDatasource().first());
     }
 
     public static Database oneConnectionDb() {
         DataSource ds = JdbcConnectionPool.create(nextDbUrl(), "user", "password");
-        Connection connection = createTables(ds);
+        Connection connection = createDatasetFromDataSource(ds);
         return Database.from(connection);
     }
 
-    private static Connection createTables(DataSource ds) {
+
+    public static Pair<DataSource, String> createDatasetAndGetDatasource() {
+        String url = nextDbUrl();
+        DataSource ds = JdbcConnectionPool.create(url, "user", "password");
+        createDatasetFromDataSource(ds);
+        return Pair.create(ds, url);
+    }
+
+    private static Connection createDatasetFromDataSource(DataSource ds) {
         Connection connection = ExceptionsHandler.handleChecked(ds::getConnection);
         createDatabase(connection);
         ExceptionsHandler.handleChecked0(connection::close);
@@ -65,6 +75,95 @@ public class DbUtils {
 
         } catch (SQLException e) {
             throw new SqlException(e);
+        }
+    }
+
+
+
+    public static class City {
+        final Integer id;
+        final String name;
+
+        public City(Integer id, String name) {
+            this.id = id;
+            this.name = name;
+        }
+
+        public static City of(Integer id, String name) {
+            return new City(id, name);
+        }
+
+        public static City convert(ResultSet rs) throws SQLException {
+            return new City(rs.getInt(1), rs.getString(2));
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            City city = (City) o;
+            return Objects.equals(id, city.id) &&
+                    Objects.equals(name, city.name);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(id, name);
+        }
+
+        @Override
+        public String toString() {
+            return "City{" +
+                    "id=" + id +
+                    ", name='" + name + '\'' +
+                    '}';
+        }
+    }
+
+    public static class Superhero {
+        final Integer id;
+        final String name;
+        final Integer puissance;
+        final Integer city_id;
+
+        public Superhero(Integer id, String name, Integer puissance, Integer city_id) {
+            this.id = id;
+            this.name = name;
+            this.puissance = puissance;
+            this.city_id = city_id;
+        }
+
+        static Superhero convert(ResultSet rs) throws SQLException {
+            return new Superhero(rs.getInt(1), rs.getString(2), rs.getInt(3), rs.getInt(4));
+        }
+
+        static ResultSetExtractor<Superhero> as() {
+            return rs -> new Superhero(rs.getInt(1), rs.getString(2), rs.getInt(3), rs.getInt(4));
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (obj instanceof Superhero) {
+                Superhero other = Superhero.class.cast(obj);
+                return Objects.equals(name, other.name);
+            } else {
+                return false;
+            }
+        }
+
+        @Override
+        public String toString() {
+            return "Superhero{" +
+                    "id=" + id +
+                    ", name='" + name + '\'' +
+                    ", puissance=" + puissance +
+                    ", city_id=" + city_id +
+                    '}';
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hashCode(name);
         }
     }
 }
