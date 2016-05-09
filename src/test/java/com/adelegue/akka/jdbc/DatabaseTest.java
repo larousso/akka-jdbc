@@ -411,7 +411,8 @@ public class DatabaseTest {
                     sql.update("update superhero set city_id = ? where id = ?").params(2, superhero.id).count()
                 ))
                 .via(sql.doOnEach(
-                    Sql.commit(), Sql.endTransaction()
+                    Sql.commit(),
+                    Sql.endTransaction()
                 ))
                 .via(sql.atTheEnd(Sql.closeConnection()))
                 .runWith(Sink.head(), materializer)

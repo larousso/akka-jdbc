@@ -190,7 +190,7 @@ public class Sql {
 
     public interface ConnectionBiAction<T> extends F.BiConsumerUnchecked<T, SqlConnection> {}
 
-    static <T> ConnectionBiAction<T> toBiAction(ConnectionAction action) {
+    public static <T> ConnectionBiAction<T> toBiAction(ConnectionAction action) {
         return (any, sqlConnection) -> action.apply(sqlConnection);
     }
 }
