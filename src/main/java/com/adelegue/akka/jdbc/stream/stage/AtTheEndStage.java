@@ -19,8 +19,8 @@ import java.util.concurrent.CompletionStage;
  */
 public class AtTheEndStage<T> extends GraphStage<FlowShape<T, T>> implements ResourcesHelper {
 
-    final Inlet<T> in = Inlet.create("QueryStage.in");
-    final Outlet<T> out = Outlet.create("QueryStage.out");
+    final Inlet<T> in = Inlet.create("AtTheEndStage.in");
+    final Outlet<T> out = Outlet.create("AtTheEndStage.out");
 
     private final CompletionStage<SqlConnection> sqlConnection;
 

@@ -124,6 +124,7 @@ public class Database {
         private Integer minPoolSize;
         private Integer maxPoolSize;
         private Class dataSourceClass;
+        private Class driverClass;
         private ActorSystem actorSystem;
         private String dispatcher;
         private Integer threadPoolSize;
@@ -159,6 +160,11 @@ public class Database {
             return this;
         }
 
+        public DatabaseBuilder withDriverClass(Class driverClass) {
+            this.driverClass = driverClass;
+            return this;
+        }
+
         public DatabaseBuilder withActorSystem(ActorSystem actorSystem) {
             this.actorSystem = actorSystem;
             return this;
@@ -191,6 +197,7 @@ public class Database {
             HikariConfig hikariConfig = new HikariConfig();
             apply(url, hikariConfig::setJdbcUrl);
             Optional.ofNullable(dataSourceClass).map(Class::getName).ifPresent(hikariConfig::setDataSourceClassName);
+            Optional.ofNullable(driverClass).map(Class::getName).ifPresent(hikariConfig::setDriverClassName);
             apply(username, hikariConfig::setUsername);
             apply(password, hikariConfig::setPassword);
             apply(minPoolSize, hikariConfig::setMinimumIdle);

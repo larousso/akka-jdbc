@@ -15,8 +15,8 @@ import com.adelegue.akka.jdbc.connection.SqlConnection;
  */
 public class BeginTransactionStage extends GraphStage<FlowShape<SqlConnection, SqlConnection>> {
 
-    final Inlet<SqlConnection> in = Inlet.create("QueryStage.in");
-    final Outlet<SqlConnection> out = Outlet.create("QueryStage.out");
+    final Inlet<SqlConnection> in = Inlet.create("BeginTransactionStage.in");
+    final Outlet<SqlConnection> out = Outlet.create("BeginTransactionStage.out");
 
     private final FlowShape<SqlConnection, SqlConnection> shape = FlowShape.of(in, out);
     @Override

@@ -89,7 +89,7 @@ public class Sql {
         return applyDispatcher(new DoOnEachBuilder<>(collect, connection).apply(), dispatcher);
     }
 
-    public DoOnEachBuilder doOnEach() {
+    public <T> DoOnEachBuilder<T> doOnEach() {
         return new DoOnEachBuilder<>(Collections.emptyList(), connection);
     }
 
@@ -130,6 +130,10 @@ public class Sql {
             action.apply(elt);
             commit(conn);
         };
+    }
+
+    public static void beginTransaction(SqlConnection connection) throws Exception {
+        connection.connection().setAutoCommit(false);
     }
 
     public static void endTransaction(SqlConnection connection) throws Exception {

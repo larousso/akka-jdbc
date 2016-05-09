@@ -18,8 +18,8 @@ import java.util.concurrent.CompletionStage;
  */
 public class CloseConnectionStage<T> extends GraphStage<FlowShape<T, T>> implements ResourcesHelper {
 
-    final Inlet<T> in = Inlet.create("QueryStage.in");
-    final Outlet<T> out = Outlet.create("QueryStage.out");
+    final Inlet<T> in = Inlet.create("CloseConnectionStage.in");
+    final Outlet<T> out = Outlet.create("CloseConnectionStage.out");
 
     private final CompletionStage<SqlConnection> sqlConnection;
 

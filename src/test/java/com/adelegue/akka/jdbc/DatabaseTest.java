@@ -393,6 +393,53 @@ public class DatabaseTest {
         assertThat(await(sql.getConnection()).connection().isClosed()).isEqualTo(true);
     }
 
+
+    @Test
+    public void update_on_transaction_bis() throws Exception {
+
+        Database database = DbUtils.pooledDb();
+        ActorMaterializer materializer = ActorMaterializer.create(database.getActorSystem());
+
+        Sql sql = database.sql().keepConnectionOpened();
+
+        sql
+                .select("select * from superhero where city_id = ?").param(3).as(Superhero::convert).get()
+                .via(sql.doOnEach(
+                    Sql::beginTransaction
+                ))
+                .via(andThen(superhero ->
+                    sql.update("update superhero set city_id = ? where id = ?").params(2, superhero.id).count()
+                ))
+                .via(sql.doOnEach(
+                    Sql.commit(), Sql.endTransaction()
+                ))
+                .via(sql.atTheEnd(Sql.closeConnection()))
+                .runWith(Sink.head(), materializer)
+                .toCompletableFuture()
+                .get();
+
+        assertThat(database.sql()
+                .select("select * from superhero where city_id = ?")
+                .param(3)
+                .get(Superhero::convert)
+                .runWith(Sink.seq(), materializer)
+                .toCompletableFuture()
+                .get().size()).isEqualTo(0);
+
+        List<Superhero> superheros = database.sql()
+                .select("select * from superhero where city_id = ?")
+                .param(2)
+                .get(Superhero::convert)
+                .runWith(Sink.seq(), materializer)
+                .toCompletableFuture()
+                .get();
+        assertThat(superheros.size()).isEqualTo(3);
+
+        assertThat(superheros).isEqualTo(Arrays.asList(new Superhero(2, "sangoku", 50, 2), new Superhero(3, "hitachi", 30, 2), new Superhero(4, "naruto", 30, 2)));
+        assertThat(await(sql.getConnection()).connection().isClosed()).isEqualTo(true);
+    }
+
+
     @Test
     public void update_and_rollback() throws Exception {
 
