@@ -77,6 +77,7 @@ public abstract class AbstractQueryBuilder<T, Out> implements Query {
                     preparedStatement.setObject(i+1, params.get(i));
                 }
             }
+            preparedStatement.setFetchSize(200);
             return preparedStatement;
         });
     }
